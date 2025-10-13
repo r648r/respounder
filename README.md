@@ -1,6 +1,6 @@
 # Respounder
 
-🇬🇧 **English** · [🇫🇷 Français](README.fr.md)
+**English** · [Français](README.fr.md)
 
 **Respounder** is a defensive **LLMNR / mDNS** scanner (a network *honeypot*). It
 repeatedly queries the local network for hostnames that **do not exist**. On a
@@ -234,7 +234,7 @@ func buildArtName(frameIdx int, quote string) string {
 }
 ```
 
-**One LLMNR query per frame** → when Responder re-prints the name, the screen is
+**One LLMNR query per frame** -> when Responder re-prints the name, the screen is
 cleared then redrawn: the cat **animates**. Constraint: an LLMNR label encodes
 its length on **one byte**, so each frame is **≤ 255 bytes** (enforced at build).
 

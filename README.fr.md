@@ -1,6 +1,6 @@
 # Respounder
 
-[🇬🇧 English](README.md) · 🇫🇷 **Français**
+[English](README.md) · **Français**
 
 **Respounder** est un scanner **LLMNR / mDNS** défensif (*honeypot* réseau). Il
 interroge en boucle le réseau local avec des noms de machines qui **n'existent
@@ -232,7 +232,7 @@ func buildArtName(frameIdx int, quote string) string {
 }
 ```
 
-Une **requête LLMNR par image** → quand Responder ré-affiche le nom, l'écran est
+Une **requête LLMNR par image** -> quand Responder ré-affiche le nom, l'écran est
 effacé puis redessiné : le chat **s'anime**. Contrainte : un label LLMNR encode sa
 longueur sur **un octet**, donc chaque image fait **≤ 255 octets** (garanti au build).
 
