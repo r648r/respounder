@@ -1,123 +1,117 @@
 # Respounder
 
-🇫🇷 **Français** · [🇬🇧 English](README.en.md)
+🇬🇧 **English** · [🇫🇷 Français](README.fr.md)
 
-**Respounder** est un scanner **LLMNR / mDNS** défensif (*honeypot* réseau). Il
-interroge en boucle le réseau local avec des noms de machines qui **n'existent
-pas**. Sur un réseau sain, personne ne répond. Si une réponse arrive, c'est
-qu'un *poisoner* — typiquement [Responder](https://github.com/lgandx/Responder)
-— est actif et usurpe ces noms pour capturer des authentifications NTLM.
+**Respounder** is a defensive **LLMNR / mDNS** scanner (a network *honeypot*). It
+repeatedly queries the local network for hostnames that **do not exist**. On a
+healthy network nobody answers. If a reply comes back, a *poisoner* — typically
+[Responder](https://github.com/lgandx/Responder) — is active and is spoofing
+those names to capture NTLM authentications.
 
-> Réécriture/extension en Go de l'outil original
-> [`codeexpress/respounder`](https://github.com/codeexpress/respounder) — voir
-> [Crédits](#crédits). Ajoute la détection **mDNS**, le scan **multi-interfaces**,
-> la détection **continue** et un mode **contre-empoisonnement** (`-spoof`).
+> Go rewrite/extension of the original
+> [`codeexpress/respounder`](https://github.com/codeexpress/respounder) — see
+> [Credits](#credits). Adds **mDNS** detection, **multi-interface** scanning,
+> **continuous** monitoring and a **counter-deception** mode (`-spoof`).
 
-## Démos (cas d'usage)
+## Demos (use cases)
 
-> Captures réelles du lab Docker ([`lab/`](lab/)) — terminal défenseur en haut,
-> terminal de l'attaquant (Responder) en bas.
+> Real captures from the Docker lab ([`lab/`](lab/)) — defender terminal on top,
+> attacker terminal (Responder) below.
 
-**1. Détection — démasquer un poisoner**
-respounder interroge des noms d'hôte fictifs ; toute réponse trahit Responder, qui
-empoisonne en croyant piéger des victimes.
+**1. Detection — unmask a poisoner**
+respounder queries fictitious hostnames; any reply gives Responder away as it
+poisons, thinking it is trapping victims.
 
-![Détection](docs/01-detection.gif)
+![Detection](docs/01-detection.gif)
 
-**2. Contre-empoisonnement (`-spoof`) — noyer le butin**
-Une fois l'attaquant repéré, respounder lui envoie des dizaines de fausses victimes
-à IP variées : ses logs de capture deviennent inexploitables.
+**2. Counter-poisoning (`-spoof`) — drown the loot**
+Once the attacker is spotted, respounder sends it dozens of fake victims with
+varied source IPs: its capture logs become useless.
 
 ![Spoof](docs/02-spoof.gif)
 
-**3. Déception (`-art`) — chat Machiavel dans le terminal de l'attaquant**
-respounder injecte des séquences d'échappement dans le nom interrogé : l'écran de
-l'attaquant s'efface et y voit s'animer un chat récitant Machiavel.
+**3. Deception (`-art`) — a Machiavelli cat in the attacker's terminal**
+respounder injects escape sequences into the queried name: the attacker's screen
+is cleared and an ASCII cat reciting Machiavelli is animated on it.
 
 ![Art](docs/03-art.gif)
 
-## Objectif
+## Purpose
 
-L'empoisonnement LLMNR/NBT-NS/mDNS est l'une des premières techniques utilisées
-lors d'une intrusion sur un domaine Windows. Respounder répond à deux besoins :
+LLMNR/NBT-NS/mDNS poisoning is one of the first techniques used during an
+intrusion on a Windows domain. Respounder serves two needs:
 
-- **Détecter** en continu la présence d'un tel attaquant sur le réseau : tout
-  `[RESPONDER DETECTED]` signale un empoisonnement en cours, puisque les noms
-  interrogés sont fictifs.
-- **Leurrer et contre-empoisonner** (option `-spoof`) : une fois l'attaquant
-  repéré, Respounder émet des requêtes avec des **IP sources usurpées** et des
-  noms de machines réalistes. Le Responder de l'attaquant croit voir affluer des
-  dizaines de victimes inexistantes et son butin se retrouve noyé sous de
-  fausses entrées inexploitables.
+- **Detect** continuously the presence of such an attacker on the network: every
+  `[RESPONDER DETECTED]` flags an ongoing poisoning, since the queried names are
+  fictitious.
+- **Decoy and counter-poison** (`-spoof`): once the attacker is spotted,
+  Respounder emits queries with **spoofed source IPs** and realistic machine
+  names. The attacker's Responder thinks it sees dozens of nonexistent victims
+  pouring in, and its loot drowns under unusable fake entries.
 
-> ⚠️ **Cadre d'utilisation** — L'écoute réseau et surtout l'émission de paquets
-> à IP source usurpée (`-spoof`, qui nécessite les droits root) ne doivent être
-> réalisées que sur un réseau dont vous êtes responsable, dans un cadre
-> défensif et autorisé.
+## How it works
 
-## Fonctionnement
+1. Each cycle (`-interval`), an LLMNR and/or mDNS query is sent on every
+   interface for one or more hostnames.
+2. Any reply received is reported as `[RESPONDER DETECTED]` (since the queried
+   name does not exist, only a malicious machine can answer).
+3. If `-spoof N` is enabled, `N` spoofed-source probes are sent once per detected
+   responder to poison its loot.
 
-1. À chaque cycle (`-interval`), une requête LLMNR et/ou mDNS est envoyée sur
-   chaque interface pour un ou plusieurs noms d'hôte.
-2. Toute réponse reçue est signalée `[RESPONDER DETECTED]` (le nom interrogé
-   n'existant pas, seule une machine malveillante peut répondre).
-3. Si `-spoof N` est activé, `N` sondes à IP usurpée sont envoyées une seule
-   fois par responder détecté pour empoisonner son butin.
-
-## Compilation
+## Build
 
 ```bash
 go build -o respounder .
 ```
 
-## Utilisation
+## Usage
 
 ```bash
-# Détection simple sur toutes les interfaces (aucun privilège particulier)
+# Simple detection on all interfaces (no privilege needed)
 ./respounder
 
-# Cibler une interface et un nom d'hôte précis
+# Target a specific interface and hostname
 ./respounder -interface eth0 -hostname Administrator
 
-# Noms d'hôte aléatoires réalistes, rattachés à un domaine
+# Realistic random hostnames, attached to a domain
 ./respounder -random -domain corp.local
 
-# LLMNR uniquement, cycle de 10 s, mode verbeux
+# LLMNR only, 10s cycle, verbose mode
 ./respounder -protocol llmnr -interval 10s -v
 
-# Contre-empoisonnement : 5 fausses victimes par responder détecté (root requis)
+# Counter-poisoning: 5 fake victims per detected responder (root required)
 sudo ./respounder -random -domain corp.local -spoof 5 -interval 10s
 ```
 
 ### Options
 
-| Flag | Description | Défaut |
-|------|-------------|--------|
-| `-hostname` | Nom(s) d'hôte à rechercher, séparés par des virgules | `Administrator` |
-| `-random` | Génère des noms d'hôte aléatoires réalistes | `false` |
-| `-domain` | Domaine ajouté au nom d'hôte (ex : `corp.local`) | — |
-| `-interface` | Interface(s) réseau, séparées par des virgules | toutes |
-| `-ip` | Adresse IP source à utiliser | auto |
-| `-protocol` | Protocole : `llmnr`, `mdns` ou `both` | `both` |
-| `-interval` | Intervalle entre deux scans | `30s` |
-| `-spoof` | Nb de sondes à IP usurpée par responder détecté (**root**) | `0` |
-| `-art` | Déception active : anime un chat citant Machiavel dans le terminal d'un poisoner à l'écoute | `false` |
-| `-v` | Mode verbeux (affiche les sondes envoyées) | `false` |
-| `-debug` | Fichier de log de trace | — |
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-hostname` | Hostname(s) to query, comma-separated | `Administrator` |
+| `-random` | Generate realistic random hostnames | `false` |
+| `-domain` | Domain appended to the hostname (e.g. `corp.local`) | — |
+| `-interface` | Network interface(s), comma-separated | all |
+| `-ip` | Source IP address to use | auto |
+| `-protocol` | Protocol: `llmnr`, `mdns` or `both` | `both` |
+| `-interval` | Interval between two scans | `30s` |
+| `-spoof` | Number of spoofed-source probes per detected responder (**root**) | `0` |
+| `-art` | Active deception: animate a Machiavelli-quoting cat into a watching poisoner's terminal | `false` |
+| `-v` | Verbose mode (show probes sent) | `false` |
+| `-debug` | Trace log file | — |
 
-## Lab de démonstration (Docker)
+## Demo lab (Docker)
 
-Le dossier [`lab/`](lab/) monte un lab à **deux hôtes isolés** sur un réseau
-bridge dédié : un *attaquant* qui lance **Responder** et un *capteur* qui lance
+The [`lab/`](lab/) folder spins up a **two isolated hosts** lab on a dedicated
+bridge network: an *attacker* running **Responder** and a *sensor* running
 **respounder**.
 
 ```bash
 cd lab
-docker compose up --build      # le capteur affiche [RESPONDER DETECTED]
-docker compose down -v         # nettoyage
+docker compose up --build      # the sensor prints [RESPONDER DETECTED]
+docker compose down -v         # tear down
 ```
 
-### 1. Côté défenseur — `respounder` démasque l'attaquant
+### 1. Defender side — `respounder` unmasks the attacker
 
 ```text
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -133,9 +127,11 @@ Interfaces: 1
 [RESPONDER DETECTED] 192.168.166.2 | From [eth0] 192.168.166.3 | Protocol: mDNS  | Query: DESKTOP-PP7Q6.local
 [RESPONDER DETECTED] 192.168.166.2 | From [eth0] 192.168.166.3 | Protocol: LLMNR | Query: ERP-GMEKTV
 [RESPONDER DETECTED] 192.168.166.2 | From [eth0] 192.168.166.3 | Protocol: mDNS  | Query: ERP-GMEKTV.local
+[RESPONDER DETECTED] 192.168.166.2 | From [eth0] 192.168.166.3 | Protocol: LLMNR | Query: SRV-ALCCI
+[RESPONDER DETECTED] 192.168.166.2 | From [eth0] 192.168.166.3 | Protocol: mDNS  | Query: SRV-ALCCI.local
 ```
 
-### 2. Côté attaquant — Responder mord à l'hameçon
+### 2. Attacker side — Responder takes the bait
 
 ```text
 [*] [LLMNR]  Poisoned answer sent to 192.168.166.3 for name DESKTOP-PP7Q6
@@ -144,11 +140,10 @@ Interfaces: 1
 [*] [MDNS]   Poisoned answer sent to 192.168.166.3 for name ERP-GMEKTV.local
 ```
 
-### 3. Contre-empoisonnement (`-spoof`) — on noie le butin de l'attaquant
+### 3. Counter-poisoning (`-spoof`) — drowning the attacker's loot
 
-Avec `-spoof 5`, Responder voit affluer des **victimes fictives à IP variées**
-(`.86`, `.36`, `.111`, `.10`, `.243`, `.20`…). Ses logs de capture deviennent
-inexploitables :
+With `-spoof 5`, Responder sees **fake victims with varied IPs** pouring in
+(`.86`, `.36`, `.111`, `.10`, `.243`, `.20`…). Its capture logs become useless:
 
 ```text
 [*] [LLMNR]  Poisoned answer sent to 192.168.166.86  for name ADMIN-KY2HCO.corp.local
@@ -159,17 +154,18 @@ inexploitables :
 [*] [LLMNR]  Poisoned answer sent to 192.168.166.20  for name LAPTOP-99R4W.corp.local
 ```
 
-### 4. Déception `-art` — un chat citant Machiavel dans le terminal de l'attaquant
+### 4. Deception `-art` — a Machiavelli-quoting cat in the attacker's terminal
 
-Un poisoner **affiche le nom interrogé**. `-art` glisse des séquences d'échappement
-ANSI dans ce nom : le terminal de l'attaquant s'efface et y voit s'animer un chat
-(3 images en boucle) récitant Machiavel. Une image (trame LLMNR ≤ 255 o) ressemble à :
+A poisoner **displays the queried name**. `-art` slips ANSI escape sequences into
+that name: the attacker's screen is cleared and an animated cat (3 looping
+frames) reciting Machiavelli appears. One frame (an LLMNR label ≤ 255 bytes)
+looks like:
 
 ```text
 [*] [LLMNR]  Poisoned answer sent to 192.168.166.3 for name \033[2J\033[H\033[2;4H  /\_/\ \033[3;4H ( o.o )\033[4;4H  > ^ < \033[6;2H\033[1;33m« The end justifies the means. »\033[0m
 ```
 
-Rendu dans **son** terminal (les escapes effacent l'écran et positionnent le curseur) :
+Rendered in **their** terminal (the escapes clear the screen and position the cursor):
 
 ```text
    /\_/\
@@ -180,28 +176,29 @@ Rendu dans **son** terminal (les escapes effacent l'écran et positionnent le cu
 ```
 
 ```bash
-respounder -art -interface eth0          # boucle d'animation (aucun privilège requis)
+respounder -art -interface eth0          # animation loop (no privilege required)
 ```
 
-> N'agit que sur un attaquant **regardant Responder en direct** dans un terminal
-> (le fichier de log stocke les octets bruts). Même cadre défensif/autorisé que `-spoof`.
+> Only affects an attacker **watching Responder live** in a terminal (the log
+> file stores the raw bytes). Same defensive/authorized scope as `-spoof`.
 
-## Sous le capot — couleurs & pilotage du terminal
+## Under the hood — colors & terminal control
 
-Tout repose sur les **séquences d'échappement ANSI** : des octets de contrôle que
-le terminal **interprète** au lieu de les afficher. Le caractère d'échappement est
-`ESC` (`0x1b`, noté `\033` ou `\x1b`).
+Everything relies on **ANSI escape sequences**: control bytes that the terminal
+**interprets** instead of displaying. The escape character is `ESC` (`0x1b`,
+written `\033` or `\x1b`).
 
-### Les couleurs (dans la sortie de respounder)
+### Colors (in respounder's own output)
 
-Un code `ESC[<n>m` (SGR) change l'attribut du texte qui suit ; `ESC[0m` réinitialise.
+An `ESC[<n>m` code (SGR) changes the attribute of the following text; `ESC[0m`
+resets it.
 
-| Séquence | Effet |
+| Sequence | Effect |
 |---|---|
-| `\033[1;36m` | cyan gras — titres / bannière |
-| `\033[1;35m` | magenta — libellés (`Query:`, `Interval:`…) |
-| `\033[1;32m` | vert — valeurs (IP, compteurs) |
-| `\033[1;31m` | rouge — alertes `[RESPONDER DETECTED]` |
+| `\033[1;36m` | bold cyan — titles / banner |
+| `\033[1;35m` | magenta — labels (`Query:`, `Interval:`…) |
+| `\033[1;32m` | green — values (IP, counters) |
+| `\033[1;31m` | red — `[RESPONDER DETECTED]` alerts |
 | `\033[0m` | reset |
 
 ```go
@@ -210,40 +207,40 @@ const colorReset = "\033[0m"
 fmt.Fprintf(os.Stderr, "%sLet's poison the poisoner%s\n", colorTitle, colorReset)
 ```
 
-### Le nettoyage + le pilotage du terminal de l'attaquant (`-art`)
+### Clearing & driving the attacker's terminal (`-art`)
 
-Un poisoner **affiche le nom interrogé**. On glisse dans ce nom, en plus des
-couleurs, des séquences qui **effacent l'écran** et **déplacent le curseur** —
-le terminal de l'attaquant les exécute :
+A poisoner **displays the queried name**. On top of colors, we slip into that
+name sequences that **clear the screen** and **move the cursor** — the attacker's
+terminal executes them:
 
-| Séquence | Effet |
+| Sequence | Effect |
 |---|---|
-| `\033[2J` | **efface tout l'écran** (le « clean ») |
-| `\033[H` | curseur en haut à gauche (`row 1, col 1`) |
-| `\033[<l>;<c>H` | place le curseur ligne `l`, colonne `c` (dessine le chat ligne par ligne) |
-| `\033[1;33m … \033[0m` | citation en jaune gras |
+| `\033[2J` | **clears the whole screen** (the "clean") |
+| `\033[H` | cursor to top-left (`row 1, col 1`) |
+| `\033[<r>;<c>H` | place the cursor at row `r`, column `c` (draw the cat line by line) |
+| `\033[1;33m … \033[0m` | quote in bold yellow |
 
-Chaque image du chat est forgée par `buildArtName` :
+Each cat frame is forged by `buildArtName`:
 
 ```go
 func buildArtName(frameIdx int, quote string) string {
     var b strings.Builder
-    b.WriteString("\x1b[2J\x1b[H")                       // efface l'écran + curseur en haut
+    b.WriteString("\x1b[2J\x1b[H")                       // clear screen + cursor home
     for i, line := range catFrames[frameIdx] {
-        fmt.Fprintf(&b, "\x1b[%d;4H%s", i+2, line)       // chaque ligne du chat, positionnée
+        fmt.Fprintf(&b, "\x1b[%d;4H%s", i+2, line)       // each cat line, positioned
     }
-    fmt.Fprintf(&b, "\x1b[6;2H\x1b[1;33m« %s »\x1b[0m", quote) // citation en jaune
+    fmt.Fprintf(&b, "\x1b[6;2H\x1b[1;33m« %s »\x1b[0m", quote) // quote in yellow
     return b.String()
 }
 ```
 
-Une **requête LLMNR par image** → quand Responder ré-affiche le nom, l'écran est
-effacé puis redessiné : le chat **s'anime**. Contrainte : un label LLMNR encode sa
-longueur sur **un octet**, donc chaque image fait **≤ 255 octets** (garanti au build).
+**One LLMNR query per frame** → when Responder re-prints the name, the screen is
+cleared then redrawn: the cat **animates**. Constraint: an LLMNR label encodes
+its length on **one byte**, so each frame is **≤ 255 bytes** (enforced at build).
 
-## Crédits
+## Credits
 
-- Outil original : **[`codeexpress/respounder`](https://github.com/codeexpress/respounder)**
-  — l'idée de détecter Responder en interrogeant des noms LLMNR fictifs.
-- Outil détecté / cible du lab : **[`lgandx/Responder`](https://github.com/lgandx/Responder)**
-  (Laurent Gaffié) — le *poisoner* LLMNR/NBT-NS/mDNS de référence.
+- Original tool: **[`codeexpress/respounder`](https://github.com/codeexpress/respounder)**
+  — the idea of detecting Responder by querying fictitious LLMNR names.
+- Detected tool / lab target: **[`lgandx/Responder`](https://github.com/lgandx/Responder)**
+  (Laurent Gaffié) — the reference LLMNR/NBT-NS/mDNS *poisoner*.
