@@ -1,0 +1,11 @@
+# Binaire compilé
+/respounder
+
+# Fichiers de log de debug (-debug)
+*.log
+
+# Rapport de qualité produit par la CI
+gl-code-quality-report.json
+
+# Lab : binaire éventuellement copié
+lab/sensor/respounder

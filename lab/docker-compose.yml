@@ -1,0 +1,25 @@
+# Two-host lab: an attacker running Responder vs a sensor running respounder.
+# Both share an isolated bridge network; respounder queries fake hostnames and
+# Responder takes the bait, revealing itself.
+#
+#   docker compose up --build       # watch lab-sensor print [RESPONDER DETECTED]
+#   docker compose down -v          # tear down
+services:
+  attacker:
+    build: ./attacker
+    container_name: lab-attacker
+    cap_add: ["NET_ADMIN", "NET_RAW"]
+    networks: [lab]
+
+  sensor:
+    build:
+      context: ..                       # repo root (needs go.mod + main.go)
+      dockerfile: lab/sensor/Dockerfile
+    container_name: lab-sensor
+    cap_add: ["NET_RAW"]                 # required for -spoof (raw sockets)
+    depends_on: [attacker]
+    networks: [lab]
+
+networks:
+  lab:
+    driver: bridge
